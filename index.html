@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>8-Track Sync Looper & Stem Mixer</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --muted-bg: #ef4444;
+      --muted-hover: #dc2626;
+      --active-bg: #10b981;
+      --active-hover: #059669;
+      --solo-bg: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      max-width: 600px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .master-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.85rem 1.8rem;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+    }
+
+    .btn-secondary {
+      background-color: #334155;
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover {
+      background-color: #475569;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .tracks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .track-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .track-card.playing {
+      border-color: #6366f1;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+    }
+
+    .track-card.is-muted {
+      opacity: 0.75;
+    }
+
+    .track-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .track-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .genre-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-jazz { background-color: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-metal { background-color: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-edm { background-color: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .visualizer-box {
+      height: 48px;
+      background-color: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 0 1rem;
+    }
+
+    .v-bar {
+      width: 4px;
+      height: 20%;
+      background-color: #6366f1;
+      border-radius: 2px;
+      transition: height 0.15s ease;
+    }
+
+    .playing .v-bar {
+      animation: pulse 0.8s ease-in-out infinite alternate;
+    }
+
+    .playing.is-muted .v-bar {
+      animation: none !important;
+      height: 10% !important;
+      background-color: #475569 !important;
+    }
+
+    @keyframes pulse {
+      0% { height: 15%; }
+      100% { height: 85%; }
+    }
+
+    .track-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .mute-btn {
+      flex: 2;
+      padding: 0.65rem;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--active-bg);
+      color: white;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    .mute-btn:hover {
+      background-color: var(--active-hover);
+    }
+
+    .mute-btn.muted {
+      background-color: var(--muted-bg);
+    }
+
+    .mute-btn.muted:hover {
+      background-color: var(--muted-hover);
+    }
+
+    .solo-btn {
+      flex: 1;
+      padding: 0.65rem;
+      border: none;
+      border-radius: 8px;
+      background-color: #334155;
+      color: #cbd5e1;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .solo-btn.active {
+      background-color: var(--solo-bg);
+      color: #000;
+    }
+
+    .vol-container {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .vol-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      min-width: 35px;
+    }
+
+    .volume-slider {
+      flex: 1;
+      accent-color: var(--primary);
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>8-Track Audio Looper</h1>
+    <p>8개의 WAV 트랙을 완벽하게 동기화하여 실시간 반복 재생 및 개별 음소거/믹싱을 지원합니다.</p>
+  </header>
+
+  <div class="master-controls">
+    <button id="playAllBtn" class="btn">▶ 전체 동시 재생</button>
+    <button id="resyncBtn" class="btn btn-secondary">🔄 싱크 맞추기</button>
+    <button id="muteAllBtn" class="btn btn-secondary">🔇 전체 음소거 / 해제</button>
+  </div>
+
+  <div class="tracks-grid" id="tracksGrid"></div>
+
+  <script>
+    // 제공된 8개 WAV 파일 목록
+    const tracksData = [
+      { name: 'Jazz Melody', file: 'Jazz Melody.wav', genre: 'jazz' },
+      { name: 'Jazz Drums', file: 'Jazz Drums.wav', genre: 'jazz' },
+      { name: 'Metal Bass', file: 'Metal Bass.wav', genre: 'metal' },
+      { name: 'Metal Drums', file: 'Metal Drums.wav', genre: 'metal' },
+      { name: 'Metal Melody', file: 'Metal Melody.wav', genre: 'metal' },
+      { name: 'EDM Bass', file: 'EDM Bass.wav', genre: 'edm' },
+      { name: 'EDM Drums', file: 'EDM Drums.wav', genre: 'edm' },
+      { name: 'EDM Melody', file: 'EDM Melody.wav', genre: 'edm' }
+    ];
+
+    const tracksGrid = document.getElementById('tracksGrid');
+    const playAllBtn = document.getElementById('playAllBtn');
+    const resyncBtn = document.getElementById('resyncBtn');
+    const muteAllBtn = document.getElementById('muteAllBtn');
+
+    const audioElements = [];
+    let isPlaying = false;
+    let isAllMuted = false;
+    let activeSoloIndex = null;
+
+    // UI 생성
+    tracksData.forEach((track, index) => {
+      const card = document.createElement('div');
+      card.className = 'track-card';
+      card.id = `card-${index}`;
+
+      card.innerHTML = `
+        <audio class="track-audio" loop preload="auto" src="${encodeURIComponent(track.file)}"></audio>
+        <div class="track-header">
+          <span class="track-title">${track.name}</span>
+          <span class="genre-badge badge-${track.genre}">${track.genre}</span>
+        </div>
+        <div class="visualizer-box">
+          <div class="v-bar" style="animation-delay: 0.1s"></div>
+          <div class="v-bar" style="animation-delay: 0.3s"></div>
+          <div class="v-bar" style="animation-delay: 0.2s"></div>
+          <div class="v-bar" style="animation-delay: 0.4s"></div>
+          <div class="v-bar" style="animation-delay: 0.15s"></div>
+        </div>
+        <div class="track-controls">
+          <div class="btn-row">
+            <button class="mute-btn" data-index="${index}">
+              <span class="icon">🔊</span> <span class="label">음성 켜짐</span>
+            </button>
+            <button class="solo-btn" data-index="${index}">SOLO</button>
+          </div>
+          <div class="vol-container">
+            <span class="vol-label">볼륨</span>
+            <input type="range" class="volume-slider" min="0" max="1" step="0.01" value="1" data-index="${index}">
+          </div>
+        </div>
+      `;
+
+      tracksGrid.appendChild(card);
+      const audio = card.querySelector('.track-audio');
+      audioElements.push(audio);
+    });
+
+    // 동시 재생 / 일시정지
+    playAllBtn.addEventListener('click', () => {
+      if (!isPlaying) {
+        syncAndPlay();
+      } else {
+        pauseAll();
+      }
+    });
+
+    function syncAndPlay() {
+      // 싱크 맞추기: 시간 제로로 맞춘 후 동시 play
+      audioElements.forEach(audio => {
+        audio.currentTime = 0;
+        audio.play().catch(err => console.log("재생 오류:", err));
+      });
+      isPlaying = true;
+      playAllBtn.innerHTML = '❚❚ 일시정지';
+      playAllBtn.style.backgroundColor = '#f59e0b';
+      
+      document.querySelectorAll('.track-card').forEach(card => card.classList.add('playing'));
+    }
+
+    function pauseAll() {
+      audioElements.forEach(audio => audio.pause());
+      isPlaying = false;
+      playAllBtn.innerHTML = '▶ 전체 동시 재생';
+      playAllBtn.style.backgroundColor = 'var(--primary)';
+      
+      document.querySelectorAll('.track-card').forEach(card => card.classList.remove('playing'));
+    }
+
+    // 싱크 다시 맞추기 버튼
+    resyncBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        audioElements.forEach(audio => {
+          audio.currentTime = 0;
+        });
+      }
+    });
+
+    // 개별 음소거 / SOLO 처리
+    tracksGrid.addEventListener('click', (e) => {
+      const targetBtn = e.target.closest('button');
+      if (!targetBtn) return;
+
+      const index = parseInt(targetBtn.dataset.index);
+      if (isNaN(index)) return;
+
+      if (targetBtn.classList.contains('mute-btn')) {
+        toggleMute(index);
+      } else if (targetBtn.classList.contains('solo-btn')) {
+        toggleSolo(index);
+      }
+    });
+
+    function toggleMute(index) {
+      const audio = audioElements[index];
+      const card = document.getElementById(`card-${index}`);
+      const btn = card.querySelector('.mute-btn');
+      
+      audio.muted = !audio.muted;
+      updateMuteUI(index);
+    }
+
+    function updateMuteUI(index) {
+      const audio = audioElements[index];
+      const card = document.getElementById(`card-${index}`);
+      const btn = card.querySelector('.mute-btn');
+
+      if (audio.muted) {
+        btn.innerHTML = '<span class="icon">🔇</span> <span class="label">음소거됨</span>';
+        btn.classList.add('muted');
+        card.classList.add('is-muted');
+      } else {
+        btn.innerHTML = '<span class="icon">🔊</span> <span class="label">음성 켜짐</span>';
+        btn.classList.remove('muted');
+        card.classList.remove('is-muted');
+      }
+    }
+
+    function toggleSolo(index) {
+      const soloBtns = document.querySelectorAll('.solo-btn');
+      
+      if (activeSoloIndex === index) {
+        // SOLO 해제: 전체 음소거 해제 (이전 상태 복원)
+        activeSoloIndex = null;
+        soloBtns.forEach(btn => btn.classList.remove('active'));
+        audioElements.forEach((audio, i) => {
+          audio.muted = false;
+          updateMuteUI(i);
+        });
+      } else {
+        // 해당 트랙만 SOLO 활성화
+        activeSoloIndex = index;
+        soloBtns.forEach((btn, i) => {
+          if (i === index) btn.classList.add('active');
+          else btn.classList.remove('active');
+        });
+
+        audioElements.forEach((audio, i) => {
+          audio.muted = (i !== index);
+          updateMuteUI(i);
+        });
+      }
+    }
+
+    // 볼륨 조절
+    tracksGrid.addEventListener('input', (e) => {
+      if (e.target.classList.contains('volume-slider')) {
+        const index = parseInt(e.target.dataset.index);
+        audioElements[index].volume = e.target.value;
+      }
+    });
+
+    // 전체 음소거 / 해제
+    muteAllBtn.addEventListener('click', () => {
+      isAllMuted = !isAllMuted;
+      audioElements.forEach((audio, index) => {
+        audio.muted = isAllMuted;
+        updateMuteUI(index);
+      });
+      if (isAllMuted) {
+        muteAllBtn.innerHTML = '🔊 전체 음소거 해제';
+      } else {
+        muteAllBtn.innerHTML = '🔇 전체 음소거';
+      }
+    });
+  </script>
+</body>
+</html>
